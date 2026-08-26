@@ -1,102 +1,31 @@
-const socket = io();
-let username = localStorage.getItem('dz-name') || prompt('Choose your player name') || 'Player';
-username = username.trim().slice(0, 20) || 'Player';
-localStorage.setItem('dz-name', username);
-let currentRoom = 'general';
-let currentOwnerId = null;
-let inVoice = false;
-const peers = new Map();
-let localStream = null;
-
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-
-function addMsg(u, m, t = Date.now()) {
-  const d = document.createElement('div');
-  d.className = 'msg';
-  d.innerHTML = `<b>${esc(u)}</b><time>${new Date(t).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</time><p>${esc(m)}</p>`;
-  $('messages').appendChild(d);
-  $('messages').scrollTop = $('messages').scrollHeight;
-}
-function addSystem(m) {
-  const d = document.createElement('div');
-  d.className = 'system'; d.textContent = m; $('messages').appendChild(d);
-}
-function renderPeople(users) {
-  $('people').innerHTML = '';
-  users.forEach(u => {
-    const d = document.createElement('div'); d.className = 'person'; d.dataset.id = u.id;
-    d.innerHTML = `<div class="avatar">${esc(u.username[0]?.toUpperCase() || '?')}</div><div><b>${esc(u.username)}</b><small>${u.id === socket.id ? 'You' : 'In room'}</small></div>`;
-    $('people').appendChild(d);
-  });
-  $('count').textContent = users.length;
-}
-function renderRooms(list) {
-  $('rooms').innerHTML = '';
-  list.forEach(r => {
-    const card = document.createElement('div');
-    card.className = 'room-card' + (r.name === currentRoom ? ' active' : '');
-    card.dataset.room = r.name;
-    card.innerHTML = `<button class="room" title="Join ${esc(r.name)}"><span class="room-dot"></span><div class="room-main"><strong>${esc(r.name)}</strong><small>${r.users} ${r.users === 1 ? 'player' : 'players'} · ${esc(r.ownerName || 'Public')}</small></div></button>${r.ownerId === socket.id ? `<button class="room-delete" title="Delete room">×</button>` : ''}`;
-    card.querySelector('.room').onclick = () => joinRoom(r.name);
-    card.querySelector('.room-delete')?.addEventListener('click', e => { e.stopPropagation(); if (confirm(`Delete #${r.name}?`)) socket.emit('delete-room', { room: r.name }); });
-    $('rooms').appendChild(card);
-  });
-  if (!list.some(r => r.name === currentRoom)) joinRoom('general');
-}
-function joinRoom(room) {
-  if (!room) return;
-  currentRoom = room;
-  $('roomTitle').textContent = '# ' + room;
-  $('messages').innerHTML = '';
-  $('deleteCurrent').classList.add('hidden');
-  socket.emit('join-room', { room, username });
-}
-function closeVoice() {
-  localStream?.getTracks().forEach(t => t.stop());
-  peers.forEach(p => p.close()); peers.clear();
-  document.querySelectorAll('audio[id^="audio-"]').forEach(a => a.remove());
-  inVoice = false; $('voiceBtn').textContent = 'Join voice'; $('muteBtn').textContent = '🎙️ Mute';
-}
-
-socket.on('rooms-list', ({ rooms }) => renderRooms(rooms));
-socket.on('room-state', ({ room, ownerId, ownerName, users }) => {
-  currentRoom = room; currentOwnerId = ownerId;
-  $('roomTitle').textContent = '# ' + room;
-  $('roomMeta').textContent = `Owned by ${ownerName}${ownerId === socket.id ? ' · You own this room' : ''}`;
-  $('deleteCurrent').classList.toggle('hidden', !ownerId || ownerId !== socket.id || room === 'general');
-  renderPeople(users); addSystem(`Welcome to #${currentRoom}. Find a teammate and squad up.`);
-});
-socket.on('room-users', ({ users }) => renderPeople(users));
-socket.on('chat-message', x => addMsg(x.username, x.message, x.time));
-socket.on('user-joined', x => addSystem(`${x.username} joined the room.`));
-socket.on('user-left', x => { peers.get(x.id)?.close(); peers.delete(x.id); addSystem('A player left the room.'); });
-socket.on('room-created', ({ room }) => joinRoom(room));
-socket.on('room-deleted', ({ room, reason }) => { closeVoice(); addSystem(reason === 'empty' ? `#${room} closed because everyone left.` : `#${room} was deleted by the owner.`); currentRoom = 'general'; joinRoom('general'); });
-socket.on('room-error', ({ message }) => alert(message));
-
-$('chatForm').onsubmit = e => { e.preventDefault(); const m = $('message').value.trim(); if (m) { socket.emit('chat-message', { room: currentRoom, message: m }); $('message').value = ''; } };
-$('createRoom').onclick = () => { $('modal').classList.remove('hidden'); $('newRoom').focus(); };
-$('cancelRoom').onclick = () => $('modal').classList.add('hidden');
-$('confirmRoom').onclick = () => { const room = $('newRoom').value.trim(); if (!room) return; socket.emit('create-room', { room, username }); $('modal').classList.add('hidden'); $('newRoom').value = ''; };
-$('newRoom').onkeydown = e => { if (e.key === 'Enter') $('confirmRoom').click(); if (e.key === 'Escape') $('cancelRoom').click(); };
-$('deleteCurrent').onclick = () => { if (currentOwnerId === socket.id && currentRoom !== 'general' && confirm(`Delete #${currentRoom}?`)) socket.emit('delete-room', { room: currentRoom }); };
-$('voiceBtn').onclick = async () => { if (inVoice) return; try { localStream = await navigator.mediaDevices.getUserMedia({audio:true}); inVoice = true; $('voiceBtn').textContent = '✓ In voice'; const ids = [...document.querySelectorAll('.person')].map(x => x.dataset.id).filter(Boolean); for (const id of ids) if (id !== socket.id) await makePeer(id, true); addSystem('You joined voice chat.'); } catch (e) { alert('Microphone permission is required for voice chat.'); } };
-$('muteBtn').onclick = () => { if (!localStream) return; const track = localStream.getAudioTracks()[0]; track.enabled = !track.enabled; $('muteBtn').textContent = track.enabled ? '🎙️ Mute' : '🔇 Unmute'; };
-$('leaveBtn').onclick = () => { closeVoice(); socket.emit('leave-room'); joinRoom('general'); };
-
-async function makePeer(id, offer = false) {
-  const pc = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-  peers.set(id, pc);
-  localStream?.getTracks().forEach(t => pc.addTrack(t, localStream));
-  pc.onicecandidate = e => e.candidate && socket.emit('ice-candidate', {to:id, candidate:e.candidate});
-  pc.ontrack = e => { let a = document.getElementById('audio-' + id); if (!a) { a = document.createElement('audio'); a.id = 'audio-' + id; a.autoplay = true; document.body.appendChild(a); } a.srcObject = e.streams[0]; };
-  if (offer) { const o = await pc.createOffer(); await pc.setLocalDescription(o); socket.emit('webrtc-offer', {to:id, offer:o}); }
-  return pc;
-}
-socket.on('webrtc-offer', async ({from, offer}) => { if (!inVoice) return; const pc = await makePeer(from); await pc.setRemoteDescription(offer); const a = await pc.createAnswer(); await pc.setLocalDescription(a); socket.emit('webrtc-answer', {to:from, answer:a}); });
-socket.on('webrtc-answer', async ({from, answer}) => { const pc = peers.get(from); if (pc) await pc.setRemoteDescription(answer); });
-socket.on('ice-candidate', async ({from, candidate}) => { const pc = peers.get(from); if (pc) try { await pc.addIceCandidate(candidate); } catch {} });
-
-socket.emit('request-rooms');
-joinRoom('general');
+let me=null, socket=null, currentRoom=null, currentUsers=[]; const peers=new Map(); let micStream=null; let rtcConfig={iceServers:[{urls:['stun:stun.l.google.com:19302']}]};
+const $=id=>document.getElementById(id); const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+async function api(url,opts={}){const r=await fetch(url,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Request failed');return j}
+async function boot(){try{const c=await api('/api/config');rtcConfig=c.rtcConfig; const m=await api('/api/me'); if(m.user) showApp(m.user); else showAuth();}catch(e){showAuth(e.message)}}
+function showAuth(msg=''){ $('auth').classList.remove('hidden');$('app').classList.add('hidden'); if(msg)$('authMsg').textContent=msg; }
+function showApp(user){me=user;$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('account').innerHTML=`${esc(user.username)}${user.role==='admin'?' • MOD':''}`; socket=io({transports:['websocket']); bindSocket(); loadRooms();}
+function bindSocket(){socket.on('rooms:update',loadRooms);socket.on('room:deleted',id=>{if(currentRoom===id){leaveRoom();}$('roomList').querySelector(`[data-id="${id}"]`)?.remove();loadRooms();});socket.on('room:error',m=>alert(m));socket.on('room:joined',room=>{currentRoom=room.id;renderHeader(room);$('chatInput').disabled=false;$('chatForm').querySelector('button').disabled=false;$('mic').disabled=false;});socket.on('room:presence',users=>{currentUsers=users;renderPresence();});socket.on('chat:message',m=>addMessage(m));socket.on('voice:peer', async p=>{try{await callPeer(p.id,true)}catch(e){console.error(e)}});socket.on('voice:signal',async ({from,data})=>handleSignal(from,data));socket.on('voice:peer-left',id=>closePeer(id));}
+async function loadRooms(){if(!me)return;const {rooms}=await api('/api/rooms');$('roomList').innerHTML=rooms.map(r=>roomCard(r)).join('')||'<p class="meta">No rooms yet. Create one!</p>';}
+function roomCard(r){const active=currentRoom===r.id; return `<div class="roomCard ${active?'active':''}" data-id="${r.id}" onclick="selectRoom('${r.id}')"><div class="roomTop"><span class="roomName">${esc(r.name)}</span><span class="badge">${r.isPrivate?'🔒 Private':'🌐 Public'}</span></div><div class="roomDesc">${esc(r.description||'LFG')}</div><div class="meta">${r.playerCount}/${r.maxPlayers} players • ${esc(r.mode)} • ${esc(r.region)}</div></div>`}
+async function selectRoom(id){ if(currentRoom===id)return; if(currentRoom) leaveRoom(); const rooms=(await api('/api/rooms')).rooms; const room=rooms.find(x=>x.id===id); if(!room)return; if(room.isPrivate){const password=prompt('Enter room password');if(password===null)return;socket.emit('room:join',{roomId:id,password});}else socket.emit('room:join',{roomId:id}); }
+function renderHeader(room){$('roomHeader').innerHTML=`<h2>${esc(room.name)}</h2><div class="meta">${esc(room.description||'')} • ${room.playerCount}/${room.maxPlayers} • owner controls are on the room card</div>`; addRoomControls(room);}
+async function addRoomControls(room){const host=document.createElement('div');host.className='roomActions'; const owner=room.ownerId===me.id||me.role==='admin'; if(owner){host.innerHTML=`<button class="small" onclick="editRoom('${room.id}')">Edit</button><button class="small danger" onclick="deleteRoom('${room.id}')">Delete room</button>`;$('roomHeader').appendChild(host)}else{host.innerHTML=`<button class="small danger" onclick="reportRoom('${room.id}')">Report room</button>`;$('roomHeader').appendChild(host)}}
+async function editRoom(id){const name=prompt('Room name');if(!name)return;const desc=prompt('Description')??'';const max=Number(prompt('Max players (2-64)','4'));try{await api('/api/rooms/'+id,{method:'PATCH',body:JSON.stringify({name,description:desc,maxPlayers:max})});loadRooms();}catch(e){alert(e.message)}}
+async function deleteRoom(id){if(!confirm('Delete this room?'))return;try{await api('/api/rooms/'+id,{method:'DELETE'});if(currentRoom===id)leaveRoom();}catch(e){alert(e.message)}}
+function renderPresence(){ $('presence').textContent=currentUsers.length?`Players here: ${currentUsers.map(x=>x.username+(x.userId===me.id?' (you)':'')).join(', ')}`:''; }
+function addMessage(m){const el=document.createElement('div');el.className='msg';el.innerHTML=`<b>${esc(m.username)}</b> <small>${new Date(m.at).toLocaleTimeString()}</small><div>${esc(m.text)}</div>`;$('messages').appendChild(el);$('messages').scrollTop=$('messages').scrollHeight}
+function leaveRoom(){if(socket&&currentRoom){socket.emit('room:leave');stopVoice();currentRoom=null;$('roomHeader').innerHTML='<h2>Select a room</h2>';$('presence').textContent='';$('messages').innerHTML='';$('chatInput').disabled=true;$('chatForm').querySelector('button').disabled=true;$('mic').disabled=true;loadRooms();}}
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{const r=await api('/api/login',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});showApp(r.user)}catch(x){$('authMsg').textContent=x.message}});
+$('registerForm').addEventListener('submit',async e=>{e.preventDefault();try{const r=await api('/api/register',{method:'POST',body:JSON.stringify({username:$('regUsername').value,email:$('regEmail').value,password:$('regPassword').value})});showApp(r.user)}catch(x){$('authMsg').textContent=x.message}});
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{$('loginForm').classList.toggle('hidden',b.dataset.tab!=='login');$('registerForm').classList.toggle('hidden',b.dataset.tab!=='register');});
+$('logout').onclick=async()=>{await api('/api/logout',{method:'POST'});location.reload()};$('refreshRooms').onclick=loadRooms;$('newRoom').onclick=()=>$('roomDialog').showModal();$('roomPrivate').onchange=()=>$('roomPassword').disabled=!$('roomPrivate').checked;$('roomPassword').disabled=true;
+$('roomForm').addEventListener('submit',async e=>{if(e.submitter?.value!=='default')return;e.preventDefault();try{const r=await api('/api/rooms',{method:'POST',body:JSON.stringify({name:$('roomName').value,description:$('roomDescription').value,maxPlayers:Number($('roomMax').value),mode:$('roomMode').value,region:$('roomRegion').value,isPrivate:$('roomPrivate').checked,password:$('roomPassword').value})});$('roomDialog').close();await loadRooms();selectRoom(r.room.id);}catch(x){$('roomMsg').textContent=x.message}});
+$('chatForm').addEventListener('submit',e=>{e.preventDefault();const text=$('chatInput').value.trim();if(text&&currentRoom){socket.emit('chat:send',{text});$('chatInput').value='';}});
+$('mic').onclick=async()=>{if(!micStream){micStream=await navigator.mediaDevices.getUserMedia({audio:true});$('mic').classList.add('on');$('mic').textContent='🎙️ Mic on';$('voiceStatus').textContent='Voice: active';for(const u of currentUsers.filter(x=>x.socketId!==socket.id)) await callPeer(u.socketId,true);socket.emit('voice:ready')}else stopVoice()};
+async function callPeer(id,initiator){if(peers.has(id))return;const pc=new RTCPeerConnection(rtcConfig);peers.set(id,pc);if(micStream)micStream.getTracks().forEach(t=>pc.addTrack(t,micStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('voice:signal',{to:id,data:{candidate:e.candidate}})};pc.ontrack=e=>{let a=document.getElementById('a-'+id);if(!a){a=document.createElement('audio');a.id='a-'+id;a.autoplay=true;document.body.appendChild(a)}a.srcObject=e.streams[0]};pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState))closePeer(id)};if(initiator){const o=await pc.createOffer();await pc.setLocalDescription(o);socket.emit('voice:signal',{to:id,data:{description:pc.localDescription}})} }
+async function handleSignal(from,data){let pc=peers.get(from);if(!pc){await callPeer(from,false);pc=peers.get(from)}if(data.description){await pc.setRemoteDescription(data.description);if(data.description.type==='offer'){const a=await pc.createAnswer();await pc.setLocalDescription(a);socket.emit('voice:signal',{to:from,data:{description:pc.localDescription}})}}else if(data.candidate){try{await pc.addIceCandidate(data.candidate)}catch{}}}
+function closePeer(id){peers.get(id)?.close();peers.delete(id);document.getElementById('a-'+id)?.remove()}
+function stopVoice(){if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null}$('mic').classList.remove('on');$('mic').textContent='🎙️ Mic off';$('voiceStatus').textContent='Voice: not connected';for(const id of peers.keys())closePeer(id);socket?.emit('voice:leave')}
+async function reportRoom(roomId){const reason=prompt('Reason: cheating, harassment, spam, abusive content, other');if(!reason)return;const details=prompt('Details (optional)')||'';try{await api('/api/reports',{method:'POST',body:JSON.stringify({roomId,reason,details})});alert('Report submitted.')}catch(e){alert(e.message)}}
+async function modOpen(){if(me?.role!=='admin')return;const {reports}=await api('/api/mod/reports');$('reports').innerHTML=reports.map(r=>`<div class="report"><b>${esc(r.reason)}</b><div>${esc(r.details)}</div><div class="meta">Reporter: ${esc(r.reporter)} • Target: ${esc(r.target_username||'room')}</div><button class="small success" onclick="resolveReport(${r.id})">Resolve</button>${r.target_user_id?`<button class="small danger" onclick="banUser(${r.target_user_id})">Ban target</button>`:''}</div>`).join('')||'<p>No open reports.</p>';$('modDialog').showModal()}
+async function resolveReport(id){await api('/api/mod/reports/'+id+'/resolve',{method:'POST'});modOpen()}async function banUser(id){const minutes=Number(prompt('Ban duration in minutes','60'));if(!minutes)return;await api('/api/mod/users/'+id+'/ban',{method:'POST',body:JSON.stringify({minutes})});modOpen()}window.modOpen=modOpen;window.selectRoom=selectRoom;window.editRoom=editRoom;window.deleteRoom=deleteRoom;window.reportRoom=reportRoom;window.resolveReport=resolveReport;window.banUser=banUser;$('closeMod').onclick=()=>$('modDialog').close();if(location.search.includes('mod=1'))document.body.insertAdjacentHTML('afterbegin','');boot();
