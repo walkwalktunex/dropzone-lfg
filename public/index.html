@@ -1,64 +1,70 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <meta name="theme-color" content="#070914"/>
-  <title>DROPZONE • LFG</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090b12">
+  <meta name="description" content="DropZone — find your Fortnite squad. No account required.">
+  <title>DROPZONE — Find Your Squad</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <div class="bg-grid"></div><div class="bg-glow bg-glow-a"></div><div class="bg-glow bg-glow-b"></div>
-  <header class="topbar">
-    <div class="brand-wrap">
-      <div class="brand-mark"><span></span><span></span><span></span></div>
-      <div><div class="brand">DROP<span>ZONE</span></div><div class="tagline">FIND YOUR SQUAD. DROP IN.</div></div>
+<div class="background"><div class="gridlines"></div><div class="glow glow-a"></div><div class="glow glow-b"></div><div class="glow glow-c"></div></div>
+<header class="nav">
+  <a href="#" class="brand"><span class="brand-icon">DZ</span><span><strong>DROP<span>ZONE</span></strong><small>LFG NETWORK</small></span></a>
+  <div class="nav-right"><span class="live-pill"><i></i><b id="onlineCount">LIVE</b></span><button id="nameBtn" class="nav-btn">Guest</button></div>
+</header>
+<main class="wrap">
+  <section id="welcome" class="welcome">
+    <div class="welcome-copy">
+      <div class="eyebrow">FORTNITE // SQUAD FINDER</div>
+      <h1>Find your squad.<br><span>Drop in faster.</span></h1>
+      <p>Real-time LFG rooms, instant chat, and squad voice. No account. No signup wall.</p>
+      <div class="trust-row"><span>⚡ Instant join</span><span>◉ Live rooms</span><span>◈ Voice ready</span></div>
     </div>
-    <div id="account" class="account-pill"></div>
-  </header>
+    <div class="welcome-card">
+      <div class="card-label"><span>QUICK JOIN</span><i>NO LOGIN</i></div>
+      <h2>What's your display name?</h2>
+      <p>Use any gamer tag. You can change it later.</p>
+      <form id="guestForm"><div class="name-input"><span>@</span><input id="guestUsername" autocomplete="nickname" maxlength="24" placeholder="Your gamer tag" required></div><button class="cta">Enter DropZone <span>→</span></button></form>
+      <div id="welcomeMsg" class="form-msg"></div>
+    </div>
+  </section>
 
-  <main class="shell">
-    <section id="auth" class="auth-screen panel">
-      <div class="auth-copy"><div class="eyebrow">FORTNITE LFG // COMMUNITY HUB</div><h1>Stop queueing alone.</h1><p>Find players, join the right room, and get in game faster. Text chat, voice chat, private squads and live LFG rooms in one place.</p><div class="feature-row"><div><strong>LIVE</strong><span>rooms & chat</span></div><div><strong>VOICE</strong><span>squad comms</span></div><div><strong>FAST</strong><span>jump in instantly</span></div></div></div>
-      <div class="auth-card guest-card">
-        <div class="auth-brand">DROPZONE <small>QUICK JOIN</small></div>
-        <p class="guest-intro">No account needed. Pick a display name and jump straight into the LFG lobby.</p>
-        <form id="guestForm" class="authForm"><input id="guestUsername" placeholder="Display name" maxlength="24" autocomplete="nickname"/><button class="primary-btn">Enter DropZone <span>→</span></button></form>
-        <div id="authMsg" class="form-msg"></div>
-      </div>
-    </section>
+  <section id="app" class="hidden">
+    <div class="hero">
+      <div><div class="eyebrow">LIVE LOBBY // FIND YOUR NEXT SQUAD</div><h2>Players are looking<br><span>right now.</span></h2><p>Pick a room, jump in, and start talking before the next match queues.</p></div>
+      <div class="hero-actions"><button id="newRoom" class="cta">＋ Create room</button><button id="refreshRooms" class="ghost">↻ Refresh</button></div>
+      <div class="hero-metrics"><div><strong id="heroRooms">0</strong><span>rooms live</span></div><div><strong id="heroPlayers">0</strong><span>players in rooms</span></div><div><strong>FREE</strong><span>to join</span></div></div>
+    </div>
 
-    <section id="app" class="hidden">
-      <section class="hero-strip panel">
-        <div><div class="eyebrow">DROPZONE // LFG NETWORK</div><h2>Find your next squad.</h2><p>Public rooms, private rooms and live voice. Pick a room and drop in.</p></div>
-        <div class="hero-actions"><button id="newRoom" class="primary-btn">＋ Create room</button><button id="refreshRooms" class="ghost-btn">↻ Refresh</button><button id="changeName" class="ghost-btn">Change name</button></div>
+    <div class="workspace">
+      <aside class="rooms panel">
+        <div class="panel-head"><div><div class="eyebrow">DISCOVER</div><h3>ACTIVE ROOMS</h3></div><span id="roomCount" class="counter">0</span></div>
+        <div class="room-tools"><input id="roomSearch" placeholder="Search rooms…"><button id="filterPublic" class="filter active">All</button><button id="filterPrivate" class="filter">Private</button></div>
+        <div id="roomList" class="room-list"></div>
+        <div class="panel-foot"><span class="pulse"></span> Live updates enabled</div>
+      </aside>
+
+      <section class="chat panel">
+        <div id="roomHeader" class="room-header empty"><div class="room-avatar">◎</div><div><div class="eyebrow">YOUR SQUAD SPACE</div><h3>Select a room</h3><p>Choose a live room to see the squad, chat, and connect on voice.</p></div></div>
+        <div id="presence" class="presence"></div>
+        <div id="messages" class="messages"><div class="chat-empty"><div class="empty-badge">✦</div><h4>Ready when you are.</h4><p>Your squad chat will appear here after you join a room.</p></div></div>
+        <form id="chatForm" class="composer"><input id="chatInput" placeholder="Join a room to chat…" autocomplete="off" disabled><button disabled>Send ↗</button></form>
+        <div class="voice"><div class="voice-info"><div class="voice-orb"><i></i><i></i><i></i></div><div><strong>Squad voice</strong><span id="voiceStatus">Not connected</span></div></div><button id="mic" class="mic" disabled>🎙 Mic off</button></div>
       </section>
-      <div class="toolbar-status"><span class="live-dot"></span><span id="status">Live matchmaking</span></div>
+    </div>
+  </section>
+</main>
 
-      <div class="layout">
-        <aside class="rooms panel">
-          <div class="section-head"><div><div class="eyebrow">BROWSE</div><h2>LFG ROOMS</h2></div><span class="room-counter" id="roomCount">0</span></div>
-          <div class="filter-chip-row"><span class="filter-chip active">All</span><span class="filter-chip">Open</span><span class="filter-chip">Private</span></div>
-          <div id="roomList"></div>
-        </aside>
+<dialog id="roomDialog"><form id="roomForm" class="modal"><div class="modal-head"><div><div class="eyebrow">NEW SQUAD</div><h2>Create a room</h2><p>Set your mode, player cap, and privacy.</p></div><button value="cancel" class="icon-btn">×</button></div><div class="fields"><label>Room name<input id="roomName" maxlength="80" placeholder="e.g. Ranked grind / chill comms" required></label><label>Description<textarea id="roomDescription" maxlength="240" placeholder="What are you looking for?"></textarea></label></div><div class="select-grid"><label>Players<select id="roomMax"><option>2</option><option>3</option><option selected>4</option><option>8</option><option>16</option><option>32</option><option>64</option></select></label><label>Mode<select id="roomMode"><option>Battle Royale</option><option>Zero Build</option><option>Ranked</option><option>Reload</option><option>Creative</option></select></label><label>Region<select id="roomRegion"><option>NA-East</option><option>NA-West</option><option>EU</option><option>OCE</option><option>BR</option><option>ME</option><option>Asia</option></select></label></div><label class="switch-row"><input id="roomPrivate" type="checkbox"><span class="switch"></span><span><b>Private room</b><small>Require a password to join.</small></span></label><input id="roomPassword" type="password" minlength="4" placeholder="Room password (private only)" disabled><div id="roomMsg" class="form-msg"></div><div class="modal-actions"><button value="cancel" class="ghost">Cancel</button><button id="createRoomBtn" value="default" class="cta">Create room →</button></div></form></dialog>
 
-        <section class="chat panel">
-          <div id="roomHeader" class="room-header empty-room"><div class="room-icon">◎</div><div><div class="eyebrow">SELECT A ROOM</div><h2>Choose a squad room</h2><p>Pick a room on the left to open chat and voice.</p></div></div>
-          <div id="presence" class="presence-bar"></div>
-          <div id="messages" class="messages"><div class="empty-chat"><div class="empty-icon">✦</div><h3>Your squad chat lives here.</h3><p>Join a room to see live messages and connect over voice.</p></div></div>
-          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Join a room to chat" disabled/><button class="send-btn" disabled>Send <span>↗</span></button></form>
-          <div class="voice-bar"><div class="voice-copy"><div class="voice-led"></div><div><strong>Squad voice</strong><span id="voiceStatus">Voice: not connected</span></div></div><button id="mic" class="mic-btn" disabled>🎙 Mic off</button></div>
-        </section>
-      </div>
-    </section>
-  </main>
+<dialog id="promptDialog"><form method="dialog" class="modal compact" id="promptForm"><div class="eyebrow" id="promptEyebrow">DROPZONE</div><h2 id="promptTitle">Enter room password</h2><p id="promptText"></p><input id="promptInput" autocomplete="off"><div id="promptError" class="form-msg"></div><div class="modal-actions"><button value="cancel" class="ghost">Cancel</button><button id="promptOk" value="default" class="cta">Continue →</button></div></form></dialog>
 
-  <dialog id="roomDialog"><form method="dialog" id="roomForm" class="dialog-card"><div class="dialog-kicker">NEW SQUAD</div><h2>Create a room</h2><p>Make a public room for anyone to join, or lock it down for your friends.</p><input id="roomName" placeholder="Room name" maxlength="80" required/><textarea id="roomDescription" placeholder="What are you looking for?" maxlength="240"></textarea><div class="grid"><label>Max players<select id="roomMax"><option>2</option><option>3</option><option selected>4</option><option>8</option><option>16</option><option>32</option><option>64</option></select></label><label>Mode<select id="roomMode"><option>Battle Royale</option><option>Zero Build</option><option>Ranked</option><option>Reload</option><option>Creative</option></select></label><label>Region<select id="roomRegion"><option>NA-East</option><option>NA-West</option><option>EU</option><option>OCE</option><option>BR</option><option>ME</option><option>Asia</option></select></label></div><label class="check"><input id="roomPrivate" type="checkbox"/><span><strong>Private room</strong><small>Require a password to join</small></span></label><input id="roomPassword" type="password" placeholder="Room password (private only)" minlength="4"/><div class="actions"><button value="cancel" class="ghost-btn">Cancel</button><button id="createRoomBtn" value="default" class="primary-btn">Create room</button></div><div id="roomMsg" class="form-msg"></div></form></dialog>
-
-  <dialog id="modDialog"><div class="dialog-card mod"><div class="dialog-kicker">MOD TOOLS</div><h2>Moderation</h2><div id="reports"></div><button id="closeMod" class="ghost-btn">Close</button></div></dialog>
-  <script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
+<dialog id="modDialog"><div class="modal"><div class="eyebrow">MODERATION</div><h2>Open reports</h2><div id="reports"></div><button id="closeMod" class="ghost">Close</button></div></dialog>
+<script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
 </body>
 </html>

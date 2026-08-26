@@ -1,30 +1,33 @@
-# DropZone LFG Pro
+# DropZone LFG Pro — fixed / no-login edition
 
-A Fortnite LFG-style community site with accounts, persistent rooms, private/password rooms, player limits, chat, WebRTC voice, reporting, and moderation.
+This build keeps users as guests. There is **no registration or login screen**. Players enter only a display name, then they can create, join, chat in, report, and manage rooms they own.
 
-## Render setup
-1. Create a Render PostgreSQL database.
-2. Create a Render Web Service from this repository.
-3. Build command: `npm install`
-4. Start command: `npm start`
-5. Add environment variables from `.env.example`:
-   - `DATABASE_URL` from your Render Postgres database
-   - `SESSION_SECRET` to a long random string
-   - `ADMIN_EMAIL` to the email that should receive moderator privileges on registration
-   - `TURN_URLS`, `TURN_USERNAME`, `TURN_CREDENTIAL` from your TURN provider
-6. Deploy.
+## Included
+- Public + private/password rooms
+- 2–64 player limit
+- Room owner controls
+- Empty custom rooms auto-delete when everyone leaves
+- Permanent public Lobby room
+- Live room counts and player presence
+- Socket.IO real-time chat
+- WebRTC voice with TURN support via environment variables
+- Reporting + moderator key panel
+- Render-friendly Postgres sessions
+- Better error messages and proxy/cookie handling for Render
 
-The app initializes its tables on startup.
+## Render
+Build: `npm install`
+Start: `npm start`
 
-## TURN
-The app will fall back to Google STUN, but public voice reliability is better with TURN. A TURN provider such as Twilio Network Traversal, Metered, or a self-hosted coturn server can supply the credentials. Put the provider's URLs/username/credential into the Render environment variables.
+Required environment variables:
+- `DATABASE_URL`
+- `SESSION_SECRET`
+- `NODE_ENV=production`
 
-## Important security notes
-- Use a strong `SESSION_SECRET` and never commit `.env`.
-- Set `NODE_ENV=production` on Render.
-- The first account whose email matches `ADMIN_EMAIL` gets moderator privileges. Change this environment variable before production or replace it with a proper invite/role flow.
-- Passwords are hashed with bcrypt.
-- Room passwords are hashed with bcrypt.
+Optional:
+- `TURN_URLS`
+- `TURN_USERNAME`
+- `TURN_CREDENTIAL`
+- `MODERATOR_KEY`
 
-## Current MVP moderation
-Moderators can view open reports, resolve them, and temporarily ban a reported user. For a larger community, add audit logs, IP/device abuse controls, rate limits, CAPTCHA, content filtering, and permanent bans.
+Do not commit `.env`.
