@@ -82,6 +82,25 @@ async function getUserById(id) { const { rows } = await pool.query('SELECT * FRO
 async function getRoom(id) { const { rows } = await pool.query('SELECT * FROM rooms WHERE id=$1', [id]); return rows[0]; }
 
 app.get('/api/config', (req,res)=>res.json({ rtcConfig }));
+app.post('/api/guest', async (req,res)=> {
+  try {
+    let username = String(req.body.username || '').trim().replace(/[^A-Za-z0-9_ -]/g, '').slice(0, 24);
+    if (!username) username = 'Guest-' + Math.floor(1000 + Math.random() * 9000);
+    if (username.length < 3) username = 'Guest-' + Math.floor(1000 + Math.random() * 9000);
+    const email = `guest-${crypto.randomUUID()}@local.invalid`;
+    const passwordHash = await bcrypt.hash(crypto.randomUUID(), 10);
+    const { rows } = await pool.query(
+      'INSERT INTO users(username,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING *',
+      [username, email, passwordHash, 'user']
+    );
+    req.session.user = userSafe(rows[0]);
+    res.json({ user: req.session.user });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not start a guest session.' });
+  }
+});
+
 app.get('/api/me', async (req,res)=> {
   if (!req.session.user) return res.json({ user:null });
   const row = await getUserById(req.session.user.id);
