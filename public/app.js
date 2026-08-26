@@ -1,7 +1,21 @@
 let me=null, socket=null, currentRoom=null, currentUsers=[]; const peers=new Map(); let micStream=null; let rtcConfig={iceServers:[{urls:['stun:stun.l.google.com:19302']}]};
 const $=id=>document.getElementById(id); const esc=s=>String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 async function api(url,opts={}){const r=await fetch(url,{headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Request failed');return j}
-async function boot(){try{const c=await api('/api/config');rtcConfig=c.rtcConfig; const m=await api('/api/me'); if(m.user) showApp(m.user); else { $('guestUsername').value=localStorage.getItem('dropzone_name')||''; showAuth(); }}catch(e){showAuth(e.message)}}
+async function boot(){
+  try {
+    const c=await api('/api/config');
+    rtcConfig=c.rtcConfig;
+    const m=await api('/api/me');
+    if(m.user) return showApp(m.user);
+    const requested=String(localStorage.getItem('dropzone_name')||'').trim();
+    const r=await api('/api/guest',{method:'POST',body:JSON.stringify({username:requested})});
+    localStorage.setItem('dropzone_name',r.user.username);
+    showApp(r.user);
+  } catch(e) {
+    console.error(e);
+    showAuth(e.message);
+  }
+}
 function showAuth(msg=''){ $('auth').classList.remove('hidden');$('app').classList.add('hidden'); if(msg)$('authMsg').textContent=msg; }
 function showApp(user){me=user;$('auth').classList.add('hidden');$('app').classList.remove('hidden');$('account').innerHTML=`${esc(user.username)}${user.role==='admin'?' • MOD':''}`; socket=io({transports:['websocket']}); bindSocket(); loadRooms();}
 function bindSocket(){socket.on('rooms:update',loadRooms);socket.on('room:deleted',id=>{if(currentRoom===id){leaveRoom();}$('roomList').querySelector(`[data-id="${id}"]`)?.remove();loadRooms();});socket.on('room:error',m=>alert(m));socket.on('room:joined',room=>{currentRoom=room.id;renderHeader(room);$('chatInput').disabled=false;$('chatForm').querySelector('button').disabled=false;$('mic').disabled=false;});socket.on('room:presence',users=>{currentUsers=users;renderPresence();});socket.on('chat:message',m=>addMessage(m));socket.on('voice:peer', async p=>{try{await callPeer(p.id,true)}catch(e){console.error(e)}});socket.on('voice:signal',async ({from,data})=>handleSignal(from,data));socket.on('voice:peer-left',id=>closePeer(id));}

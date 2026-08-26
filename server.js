@@ -76,7 +76,33 @@ function userSafe(row) { return { id: row.id, username: row.username, role: row.
 function publicRoom(row, playerCount = 0) {
   return { id: row.id, name: row.name, description: row.description, maxPlayers: row.max_players, playerCount, isPrivate: row.is_private, mode: row.mode, region: row.region, ownerId: row.owner_id, createdAt: row.created_at };
 }
-function requireAuth(req, res, next) { if (!req.session.user) return res.status(401).json({ error: 'Login required.' }); next(); }
+async function ensureGuest(req, res, next) {
+  if (req.session.user) return next();
+  try {
+    let base = String(req.headers['x-dropzone-name'] || req.body?.username || '').trim().replace(/[^A-Za-z0-9_ -]/g, '').slice(0, 24);
+    if (!base || base.length < 3) base = 'Guest-' + Math.floor(1000 + Math.random() * 9000);
+    let username = base;
+    for (let i = 0; i < 8; i++) {
+      try {
+        const email = `guest-${crypto.randomUUID()}@local.invalid`;
+        const passwordHash = await bcrypt.hash(crypto.randomUUID(), 10);
+        const { rows } = await pool.query(
+          'INSERT INTO users(username,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING *',
+          [username, email, passwordHash, 'user']
+        );
+        req.session.user = userSafe(rows[0]);
+        return next();
+      } catch (e) {
+        if (e.code !== '23505') throw e;
+        username = (base.slice(0, 19) + '-' + Math.floor(100 + Math.random() * 900)).slice(0, 24);
+      }
+    }
+    return res.status(500).json({ error: 'Could not create a guest session.' });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Could not start a guest session.' });
+  }
+}
 function requireAdmin(req, res, next) { if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).json({ error: 'Moderator access required.' }); next(); }
 async function getUserById(id) { const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [id]); return rows[0]; }
 async function getRoom(id) { const { rows } = await pool.query('SELECT * FROM rooms WHERE id=$1', [id]); return rows[0]; }
@@ -144,7 +170,7 @@ app.get('/api/rooms', async (req,res)=> {
   res.json({ rooms: rows.map(r=>publicRoom(r,countMap.get(r.id)||0)) });
 });
 
-app.post('/api/rooms', requireAuth, async (req,res)=> {
+app.post('/api/rooms', ensureGuest, async (req,res)=> {
   const name = String(req.body.name||'').trim();
   const description = String(req.body.description||'').trim().slice(0,240);
   const maxPlayers = Number(req.body.maxPlayers||4);
@@ -161,7 +187,7 @@ app.post('/api/rooms', requireAuth, async (req,res)=> {
   io.emit('rooms:update');
 });
 
-app.patch('/api/rooms/:id', requireAuth, async (req,res)=> {
+app.patch('/api/rooms/:id', ensureGuest, async (req,res)=> {
   const room = await getRoom(req.params.id); if (!room) return res.status(404).json({error:'Room not found.'});
   if (room.owner_id !== req.session.user.id && req.session.user.role !== 'admin') return res.status(403).json({error:'Only the room owner or moderator can edit this room.'});
   const name = String(req.body.name ?? room.name).trim().slice(0,80);
@@ -175,14 +201,14 @@ app.patch('/api/rooms/:id', requireAuth, async (req,res)=> {
   io.emit('rooms:update'); res.json({ok:true});
 });
 
-app.delete('/api/rooms/:id', requireAuth, async (req,res)=> {
+app.delete('/api/rooms/:id', ensureGuest, async (req,res)=> {
   const room = await getRoom(req.params.id); if (!room) return res.status(404).json({error:'Room not found.'});
   if (room.owner_id !== req.session.user.id && req.session.user.role !== 'admin') return res.status(403).json({error:'Only the room owner or moderator can delete this room.'});
   await pool.query('DELETE FROM rooms WHERE id=$1',[room.id]);
   io.emit('room:deleted', room.id); io.emit('rooms:update'); res.json({ok:true});
 });
 
-app.post('/api/reports', requireAuth, async (req,res)=> {
+app.post('/api/reports', ensureGuest, async (req,res)=> {
   const targetUserId = req.body.targetUserId ? Number(req.body.targetUserId) : null;
   const roomId = req.body.roomId ? String(req.body.roomId) : null;
   const reason = String(req.body.reason||'Other').slice(0,80);
