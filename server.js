@@ -90,6 +90,23 @@ async function initDb() {
     banned_until TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+
+  // Migration for databases created by earlier account-enabled versions.
+  // Guests no longer use email/password, so legacy email/password columns
+  // must not block the system guest account from being created.
+  await pool.query(`
+    ALTER TABLE users
+      ALTER COLUMN email DROP NOT NULL
+  `).catch(async (error) => {
+    // PostgreSQL throws if the legacy column does not exist; that is safe to ignore.
+    if (error.code !== '42703') throw error;
+  });
+  await pool.query(`
+    ALTER TABLE users
+      ALTER COLUMN password_hash DROP NOT NULL
+  `).catch(async (error) => {
+    if (error.code !== '42703') throw error;
+  });
   await pool.query(`CREATE TABLE IF NOT EXISTS rooms (
     id UUID PRIMARY KEY,
     owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
